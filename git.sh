@@ -1,11 +1,14 @@
 #!/bin/bash
 
-main () {
+main () (
+	declare_strings "$@"
+	declare_git_commands
+	declare_ssh_auth_eval
 	add_ssh_key_to_ssh_agent
-	execute_git_command
-}
+	exec_git_command "$@"
+)
 
-STRINGS=$(cat <<- "EOF"
+declare_strings () {
 	REPO_NAME="python-fun"
 	GH_EMAIL="diamond2sword@gmail.com"
 	GH_NAME="diamond2sword"
@@ -18,87 +21,68 @@ STRINGS=$(cat <<- "EOF"
 	PROJECT_NAME="project"
 	SSH_DIR_NAME=".ssh"
 	SSH_KEY_FILE_NAME="id_rsa"
-	ROOT_PATH="/root"
+	ROOT_PATH="$HOME"
 	REPO_PATH="$ROOT_PATH/$REPO_NAME"
-	THIS_FILE_PATH="$ROOT_PATH/$THIS_FILE_NAME"
 	SSH_TRUE_DIR="$ROOT_PATH/$SSH_DIR_NAME"
 	SSH_REPO_DIR="$REPO_PATH/$SSH_DIR_NAME"
 	REPO_URL="https://github.com/$GH_NAME/$REPO_NAME"
 	SSH_REPO_URL="git@github.com:$GH_NAME/$REPO_NAME"
-EOF
-)
-
-execute_git_command () {
-	bash -c "{
-		$STRINGS
-		$SSH_AUTH_EVAL
-		$ALL_GIT_COMMANDS
-		$INPUT
-		$EXEC_GIT_COMMAND
-	}"
 }
 
-add_ssh_key_to_ssh_agent () {
-	bash -c "{
-		$STRINGS
-		$SSH_AUTH_EVAL
-		$SSH_REGISTER_GIT
-	}"
-}
-
-EXEC_GIT_COMMAND=$(cat <<- "EOF"
+exec_git_command () {
 	main () {
-		reset_git_credentials
-		exec_git_command
+		git_command=$1; shift
+		args="$@"
+		reset_credentials
+		eval $git_command "$args"
 	}
 
-	exec_git_command () {
-		git_command="${INPUT[0]}"
-		eval "${!git_command}"
+	is_var_set () {
+		git_command=$1
+		! [[ "$git_command" ]] && {
+			return
+		}
+		return 0
 	}
 
-	reset_git_credentials () {
-		eval "$GIT_UNSET"
-	}
-	
-	main
-EOF
-)
+	main "$@"
+}
 
-ALL_GIT_COMMANDS=$(cat <<- "EOF"
-	GIT_UNSET=$(cat << "EOF2"
+declare_git_commands () {
+	reset_credentials () {
 		cd "$REPO_PATH"
 		git config --global --unset credential.helper
 		git config --system --unset credential.helper
 		git config --global user.name "$GH_NAME"
 		git config --global user.email "$GH_EMAIL"
-	EOF2
-	)
+	}
 
-	GIT_PUSH=$(cat << "EOF2"
+	push () {
 		cd "$REPO_PATH"
 		git add .
 		git commit -m "$COMMIT_NAME"
 		git remote set-url origin "$SSH_REPO_URL"
 		ssh_auth_eval "git push -u origin $BRANCH_NAME"
-	EOF2
-	)
+	}
 
-	GIT_RESET=$(cat << "EOF2"
+	reset () {
 		rm -r -f "$REPO_PATH"
 		mkdir -p "$REPO_PATH"
 		cd "$REPO_PATH"
 		git clone "$REPO_URL" "$REPO_PATH"
-	EOF2
-	)
+	}
 
-	GIT_CONFIG=$(cat << "EOF2"
-		KEY_NAME=${INPUT[1]}
-		NEW_VALUE=${INPUT[2]}
+	config () {
+		KEY_NAME=$1; shift
+		NEW_VALUE=$1
+		[[ "$KEY_NAME" == "REPO_NAME" ]] && {
+			REPO_NAME="$NEW_VALUE"
+		}
+
 		sed -i '{
-			/^STRINGS=/{
+			/^declare_strings/{
 				:start
-				/\nEOF/!{
+				/\n\}/!{
 					/'"$KEY_NAME"'=/{
 						b found
 					}
@@ -107,34 +91,31 @@ ALL_GIT_COMMANDS=$(cat <<- "EOF"
 				}
 				b exit
 				:found
-				/^STRINGS=/!{
-					s/'"$KEY_NAME"'.*$/'"$KEY_NAME"'="'"$NEW_VALUE"'"/
+				/^declare_strings/!{
+					s/'"$KEY_NAME"'=.*$/'"$KEY_NAME"'="'"$NEW_VALUE"'"/
 				}
 			}
 			:exit
-		}' $THIS_FILE_PATH
-	EOF2
-	)
-EOF
-)
+		}' $ROOT_PATH/$REPO_NAME/$THIS_FILE_NAME
+	}
+}
 
-SSH_REGISTER_GIT=$(cat <<- "EOF"
-	#!/bin/bash
+add_ssh_key_to_ssh_agent () {
 	mkdir -p "$SSH_TRUE_DIR"
 	cp -f $(eval echo $SSH_REPO_DIR/*) "$SSH_TRUE_DIR"
 	chmod 600 "$SSH_TRUE_DIR/$SSH_KEY_FILE_NAME"
 	eval "$(ssh-agent -s)"
 	ssh_auth_eval ssh-add $SSH_TRUE_DIR/$SSH_KEY_FILE_NAME
-EOF
-)
+}
 
 
-SSH_AUTH_EVAL=$(cat <<- "EOF"
+declare_ssh_auth_eval () {
+eval "$(cat <<- "EOF"
 	ssh_auth_eval () {
-		command=("$@")
+		command="$@"
 		ssh_key_passphrase="$SSH_KEY_PASSPHRASE"
 		expect << EOF2
-			spawn ${command[@]}
+			spawn $command
 			expect {
 				-re {Enter passphrase for} {
 					send "$ssh_key_passphrase\r"
@@ -149,11 +130,8 @@ SSH_AUTH_EVAL=$(cat <<- "EOF"
 		EOF2
 	}
 EOF
-)
+)"
+}
 
-INPUT=$(cat << EOF
-	INPUT=($@)
-EOF
-)
+main "$@"
 
-main
