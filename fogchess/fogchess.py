@@ -122,9 +122,9 @@ class Move:
             resultParams= []
             for paramDict in paramDicts:
                 valueDict= {}
-                for i in range(len(param["valueDict"])):
-                    key= param["valueDict"][i]["key"]
-                    value= param["valueDict"][i]["value"]
+                for i in range(len(paramDict["valueDict"])):
+                    key= paramDict["valueDict"][i]["key"]
+                    value= paramDict["valueDict"][i]["value"]
                     valueDict.update({key: value})
                 resultParams.append(Move.Param(paramDict["name"],
                                                valueDict,))
@@ -168,9 +168,13 @@ class Board:
     @staticmethod
     def fromDict(bDict: dict)->"Board":
         return Board(bDict["width"],
-                     bDict["team"],)
+                     bDict["team"],
+                     bDict["pieces"])
 
-    def __init__(self, width: int, team: int)->None:
+    def __init__(self,
+                 width: int, 
+                 team: int, 
+                 pieces: dict[int,dict[int,int]]={})->None:
         self.width= width
         self.team= team
         self.pieces: dict[int,dict[int,Piece]]= {}
@@ -180,6 +184,10 @@ class Board:
                 self.pieces[i][j]= Piece.EMPTY()
                 self.pieces[i][j].coordinates= [{"rank": [j],
                                                  "file": [i],}]
+                
+                if pieces == {}: continue
+                self.pieces[i][j].name= [cast(int|str, pieces[i][j])]
+
 
     def __iter__(self)->"Board":
         self.iterN= 0

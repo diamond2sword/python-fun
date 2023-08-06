@@ -1,6 +1,14 @@
 {
-	"moves":[],
-	"pieces":[],
-	"board":{}
-	"IsWorking": 
+    "board": {},
+    "moves": [],
+    "pieces": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+    ],
+    "vDictPath": "game.json"
 }
