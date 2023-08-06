@@ -1,10 +1,9 @@
 def main()->None:
     cmdDict= [{"desc": "add piece", "call": addPiece},
               {"desc": "del piece", "call": delPiece},
-#              {"desc": "edit piece", "call": editPiece},
-#              {"desc": "add move", "call": addMove}, 
-#              {"desc": "del move", "call": delMove},
-#              {"desc": "edit move", "call": editMove},
+              {"desc": "add move", "call": addMove}, 
+              {"desc": "del move", "call": delMove},
+              {"desc": "edit move", "call": editMove},
 #              {"desc": "edit board", "call": editBoard},
               {"desc": "init variant", "call": initVariant},
               {"desc": "load variant", "call": loadVariant},
@@ -30,29 +29,91 @@ def runLoop(vDict, cmdDict)->None:
         cmdDict[cmdIndex]["call"](vDict)
         #except Exception as e: print(f'runLoop: {e}')
 
-def delPiece(vDict): pass
+def editMove(vDict):
+    moveBNames= [moveB["name"] for moveB in vDict["moves"]]
+    print(f'moves= {moveBNames}')
+    if len(moveBNames) == 0: return
+    moveAName= readStr(defReadStrParam("edit move", ["int"]))
+    if moveAName not in moveBNames: return
+    for i in range(len(vDict["moves"])):
+        if vDict["moves"][i]["name"] != moveAName: continue
+        break
+    vDict["moves"][i]= readData(getMoveReadDataParam(),
+                                isEditing=True,
+                                dataA=vDict["moves"][i],
+                                mustPrettyPrint=True)
     
 
+    
+
+    
+def delMove(vDict):
+    moveBNames= [moveB["name"] for moveB in vDict["moves"]]
+    print(f'moves= {moveBNames}')
+    if len(moveBNames) == 0: return
+    moveAName= readStr(defReadStrParam("delete move", ["int"]))
+    if moveAName not in moveBNames: return
+    for i in range(len(vDict["moves"])):
+        if vDict["moves"][i]["name"] != moveAName: continue
+        del vDict["moves"][i]
+        break
+    print("move successfully removed")
+
+
+def addMove(vDict):
+    moveA= readData(getMoveReadDataParam())
+    moveBNames= [moveB["name"] for moveB in vDict["moves"]]  
+    if moveA["name"] in moveBNames:
+        mustChangeName= "y" == input(f'the name \'{moveA["name"]}\' already used: {moveBNames}\nautomatically change name?[y]:')
+        if not mustChangeName: return
+        name= -1
+        while True:
+            name+= 1
+            if name in moveBNames: continue
+            moveA["name"]= name
+            break
+        print(f'changed the move\'s name to \'{name}\'')
+    pprint.pprint(moveA)
+    mustAdd= "y" == input("confirm addition?[y]:")
+    if not mustAdd: return
+    vDict["moves"].append(moveA)
+    print("move successfully added")
+
+def delPiece(vDict):
+    print(f'pieces= {vDict["pieces"]}')
+    if len(vDict["pieces"]) == 0: return
+    piece= readStr(defReadStrParam("delete piece", ["int"]))
+    if piece not in vDict["pieces"]: return
+    vDict["pieces"].remove(piece)
+    print("piece successfully removed")
+
 def addPiece(vDict):
-    piece= readData(getPieceReadDataParam())
-    if piece not in vDict["pieces"]:
-        vDict["pieces"].append(piece)
+    print(f'pieces= {vDict["pieces"]}')
+    piece= readStr(defReadStrParam("add piece", ["int"]))
+    if piece in vDict["pieces"]: return
+    vDict["pieces"].append(piece)
+    print("piece successfully added")
 
 def quitVariantMaker(vDict):
     vDictPath= vDict["vDictPath"]
-    if vDict["vDictPath"] == "": vDictPath= input("vDictPath[optional]:")
+    mustSave= False
+    if vDict != EMPTY_VARIANT_DICT():
+        mustSave= "y" == input("save changes?[y]:")
+    inputDesc= "required" if mustSave else "optional"
+    if vDict["vDictPath"] == "": 
+        vDictPath= input(f'vDictPath[{inputDesc}]:')
     if vDictPath == "": quit()
     vDict["vDictPath"]= vDictPath
+    if not mustSave: quit()
     try:
         oldVDict= loadJsonToDict(vDictPath)
         if oldVDict == vDict: quit()
-        mustSave= "y" == input(f'overwrite \'{vDictPath}\'?[y]:')
-        if not mustSave: quit()
-        try: saveVariant(vDict, vDictPath)
-        except Exception as e:  
-            mustCancel= input(f'{e}\nfailed to save, cancel quitting?[y]:')
-            if mustCancel: return
-    except Exception as e: print(e) 
+        mustOverwrite= "y" == input(f'overwrite \'{vDictPath}\'?[y]:')
+    except Exception as e: print(e)
+    try: saveVariant(vDict, vDictPath)
+    except Exception as e:
+        mustCancel= input(f'{e}\nfailed to save, cancel quitting?[y]:')
+        if mustCancel: return
     quit()
 
 
@@ -97,7 +158,7 @@ def saveVariant(vDict, vDictPath="", mustMakeBackup=True):
 
 def loadVariant(vDict, vDictPath=""):
     inputDesc= "required" if vDictPath == "" else "optional"
-        vDictPath= input(f'vDictPath[{inputDesc}]:')
+    vDictPath= input(f'vDictPath[{inputDesc}]:')
     try:
         vDict.update(loadJsonToDict(vDictPath))
         vDict["vDictPath"]= vDictPath
@@ -106,10 +167,7 @@ def loadVariant(vDict, vDictPath=""):
     print(f'vDictPath=\'{vDict["vDictPath"]}\'')
 
 def initVariant(vDict):
-    dictA= {"pieces": [],
-            "moves": [],
-            "board": {},
-            "vDictPath": ""}
+    dictA= EMPTY_VARIANT_DICT()
     dictA.update(DCP(vDict))
     vDict.update(dictA)
     print("successfully initialized, initializing creates missing mappings of dict")
@@ -119,6 +177,40 @@ def loadJsonToDict(jsonPath):
     jsonDict= json.load(jsonFile)
     return jsonDict
 
+def getMoveReadDataParam():
+    def main():
+        return defReadDataParam(readDict,
+               defReadDictParam("move", [
+                   defReadDictMapping("name", readStr,
+                       defReadStrParam("", ["int"])),
+                   defReadDictMapping("radius", readStr,
+                       defReadStrParam("", ["int"])),
+                   defReadDictMapping("iteration", readStr,
+                       defReadStrParam("", ["int"])),
+                   defReadDictMapping("oldPiece", readData, getPieceReadDataParam()),
+                   defReadDictMapping("newPiece", readData, getPieceReadDataParam()),
+                   defReadDictMapping("changes", readList,
+                       defReadListParam("list[pieces]", readData, getPieceReadDataParam())),
+                   defReadDictMapping("conditions", readList,
+                       defReadListParam("list[pieces]", readData, getPieceReadDataParam())),
+                   defReadDictMapping("moveParams", readList,
+                       defReadListParam("list[moveParam]", readData, getMoveParamReadDataParam()))]))
+
+    def getMoveParamReadDataParam():
+        return defReadDataParam(readDict,
+               defReadDictParam("moveParam", [
+                   defReadDictMapping("name", readStr,
+                       defReadStrParam("", ["str"])),
+                   defReadDictMapping("valueDict", readList,
+                       defReadListParam("list[mapping]", readDict,
+                       defReadDictParam("mapping", [
+                           defReadDictMapping("key", readStr,
+                              defReadStrParam("", ["str"])),
+                           defReadDictMapping("value", readStr,
+                              defReadStrParam("", ["int"]))])))]))
+
+    return main()
+                   
 
 def getPieceReadDataParam():
     def main():
@@ -159,7 +251,7 @@ def defReadDictParam(desc, mappings):
             "mappings": mappings}
 
 def defReadDictMapping(key, call, callParam):
-    calls= [readList, readDict, readStr]
+    calls= [readList, readDict, readStr, readData]
     if call not in calls:
         raise Exception("defReadListParam: call must be in {calls}")
     return {"key": str(key),
@@ -168,7 +260,7 @@ def defReadDictMapping(key, call, callParam):
 
 
 def defReadListParam(desc, call, callParam,):
-    calls= [readList, readDict, readStr]
+    calls= [readList, readDict, readStr, readData]
     if call not in calls:
         raise Exception("defReadListParam: call must be in {calls}")
     return {"desc": str(desc),
@@ -183,26 +275,52 @@ def defReadStrParam(desc, typeList):
     return {"desc": str(desc),
             "type": typeList}
 
-def readData(param):
-    return param["call"](param["param"])
-    
 
-def readDict(param, nIndent= 0)->dict:
+def readData(param, nIndent= 0, isEditing=False, dataA=None, mustPrettyPrint=False):
+    return param["call"](param["param"], nIndent, isEditing, dataA, mustPrettyPrint)
+
+
+def readDict(param, nIndent= 0, isEditing=False, dictA=None, mustPrettyPrint=False)->dict:
     indent= INDENT_STR * nIndent
     resultDict={}
     print(f'{indent}readDict: {param["desc"]}')
+    if isEditing:
+        if mustPrettyPrint: pprint.pprint(dictA)
+        mustEdit= "y" == input(f'{indent}readDict: dictA={dictA}, edit?[y]:')
+        if not mustEdit: return dictA
+        resultDict.update(dictA)
+        for mDict in param["mappings"]:
+            k= mDict["key"]
+            mustEditMapping= "y" == input(f'{indent}readDict: dictA["{k}"]={dictA[k]}, edit?[y]:')
+            if not mustEditMapping: continue
+            data= mDict["call"](mDict["param"], nIndent+1, isEditing, dictA[k], mustPrettyPrint)
+            resultDict.update({mDict["key"]: data})
+        return resultDict
     for mDict in param["mappings"]:
         print(f'{indent}readDict: mapping key \'{mDict["key"]}\'')
         data= mDict["call"](mDict["param"], nIndent+1)
-        resultDict[mDict["key"]]= data
+        resultDict.update({mDict["key"]: data})
     return resultDict
-        
 
-def readList(param, nIndent= 0)->list:
+
+def readList(param, nIndent= 0, isEditing=False, listA=None, mustPrettyPrint=False)->list:
     indent= INDENT_STR * nIndent
     resultList= []
+    if isEditing:
+        mustEdit= "y" == input(f'{indent}readList: listA={listA}, edit?[y]:')
+        if not mustEdit: return listA
+        for i in range(len(listA)):
+            mustEditElement= input(f'{indent}readList: listA[{i}]={listA[i]}, edit?[y]:')
+            if not mustEditElement: break
+            while True:
+                data= param["call"](param["param"], nIndent+1, isEditing, listA[i], mustPrettyPrint)
+                if data in resultList:
+                    print(f'{indent}readList: input already in the list')
+                    continue
+                resultList.append(data)
     while True:
-        if input(f'{indent}readList: {param["desc"]}, close list?[y]:') == "y": break
+        mustClose= "y" == input(f'{indent}readList: {param["desc"]}, close list?[y]:') 
+        if mustClose: break
         data= param["call"](param["param"], nIndent+1)
         if data in resultList:
             print(f'{indent}readList: input already in the list')
@@ -211,9 +329,12 @@ def readList(param, nIndent= 0)->list:
     return resultList
 
 
-def readStr(param, nIndent= 0):
+def readStr(param, nIndent=0, isEditing=False, dataA=None, mustPrettyPrint=False):
     indent= INDENT_STR * nIndent
     isTypeValid= False
+    if isEditing:
+        mustEdit= "y" == input(f'{indent}readStr: dataA={dataA}, edit?[y]:')
+        if not mustEdit: return dataA
     while True:
         data= input(f'{indent}readStr: {param["type"]}{param["desc"]}:')
         for castType in param["type"]:
@@ -225,6 +346,8 @@ def readStr(param, nIndent= 0):
         print(f'{indent}readStr: input type of \'{data}\' not in {param["type"]}')
     return data
 
+
+
  
 
 
@@ -233,8 +356,11 @@ def readStr(param, nIndent= 0):
         
     
 
-
-INDENT_STR= "  "
+def EMPTY_VARIANT_DICT(): return {"pieces": [],
+                                  "moves": [],
+                                  "board": {},
+                                  "vDictPath": ""}
+INDENT_STR= "  "                 
 import json, ast, pprint, shutil, os
 from copy import deepcopy as DCP
 if __name__ == "__main__":

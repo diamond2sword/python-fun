@@ -121,8 +121,13 @@ class Move:
         def fromDict(paramDicts: list[dict])->list["Move.Param"]:
             resultParams= []
             for paramDict in paramDicts:
+                valueDict= {}
+                for i in range(len(param["valueDict"])):
+                    key= param["valueDict"][i]["key"]
+                    value= param["valueDict"][i]["value"]
+                    valueDict.update({key: value})
                 resultParams.append(Move.Param(paramDict["name"],
-                                               paramDict["valueDict"],))
+                                               valueDict,))
             return resultParams
 
         def __init__(self,
