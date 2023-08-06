@@ -1,84 +1,154 @@
 def main()->None:
-    cmdDict= {0: {"desc": "change path", "call": changePath},
-              1: {"desc": "add piece", "call": addPiece},
-#              2: {"desc": "del piece", "call": delPiece},
-#              3: {"desc": "edit piece", "call": editPiece},
-#              4: {"desc": "add move", "call": addMove}, 
-#              5: {"desc": "del move", "call": delMove},
-#              6: {"desc": "edit move", "call": editMove},
-#              7: {"desc": "edit board", "call": editBoard},
-#              8: {"desc": "save variant", "call": saveVariant},
-              9: {"desc": "quit", "call": None},}
-    vDict: dict= {}
+    cmdDict= [{"desc": "add piece", "call": addPiece},
+              {"desc": "del piece", "call": delPiece},
+#              {"desc": "edit piece", "call": editPiece},
+#              {"desc": "add move", "call": addMove}, 
+#              {"desc": "del move", "call": delMove},
+#              {"desc": "edit move", "call": editMove},
+#              {"desc": "edit board", "call": editBoard},
+              {"desc": "init variant", "call": initVariant},
+              {"desc": "load variant", "call": loadVariant},
+              {"desc": "save variant", "call": saveVariant},
+
+              {"desc": "quit", "call": quitVariantMaker},]
+    vDict= {}
+    initVariant(vDict)
     runLoop(vDict, cmdDict)
 
 def runLoop(vDict, cmdDict)->None:
-    cmds= cmdDict.keys()
+    cmdIndexes= [i for i in range(len(cmdDict))]
     cmdStr= ""
-    for k in cmds:
-        desc= cmdDict[k]["desc"]
-        cmdStr+= f"\n{k}: {desc}"
+    for i in range(len(cmdDict)):
+        desc= cmdDict[i]["desc"]
+        cmdStr+= f'\n{i}: {desc}'
     while True:
         print(cmdStr)
-        cmd = int(input("cmd:"))
-        if cmd not in cmds:
+        #try:
+        cmdIndex = int(input("cmd:"))
+        if cmdIndex not in cmdIndexes:
             continue
-        if cmdDict[cmd]["call"] == None:
-            break
-        cmdDict[cmd]["call"](vDict)
+        cmdDict[cmdIndex]["call"](vDict)
+        #except Exception as e: print(f'runLoop: {e}')
+
+def delPiece(vDict): pass
+    
 
 def addPiece(vDict):
-    resultDict= {}
-    resultDict.update({
-        "name": readData(
-            defReadDataParam(readList,
-            defReadListParam("list[name]", readStr, 
-            defReadStrParam("", ["int"])))),
-        "team": readData(
-            defReadDataParam(readList,
-            defReadListParam("list[team]", readStr,
-            defReadStrParam("", ["int"])))),
-        "coordinates": readData(
-            defReadDataParam(readList,
-            defReadListParam("list[coordinates]", readDict,
-            defReadDictParam("coordinates", [
-                defReadDictMapping("file", readList,
-                defReadListParam("list[file]", readStr,
-                defReadStrParam("", ["int", "str"]))),
-                defReadDictMapping("rank", readList,
-                defReadListParam("list[rank]", readStr,
-                defReadStrParam("", ["int", "str"])))])))),
-        "whiteLightLevel": readData(
-            defReadDataParam(readList,
-            defReadListParam("list[whiteLightLevel]", readStr,
-            defReadStrParam("", ["int"])))),
-        "blackLightLevel": readData(
-            defReadDataParam(readList,
-            defReadListParam("list[blackLightLevel]", readStr,
-            defReadStrParam("", ["int"])))),
-        "recentMove": readData(
-            defReadDataParam(readList,
-            defReadListParam("list[recentMove]", readDict,
-            defReadDictParam("recentMove", [
-                defReadDictMapping("file", readList,
-                defReadListParam("list[name]", readStr,
-                defReadStrParam("", ["int", "str"]))),
-                defReadDictMapping("rank", readList,
-                defReadListParam("list[iteration]", readStr,
-                defReadStrParam("", ["int", "str"])))])))),
-        "hasMoved": readData(
-            defRead
+    piece= readData(getPieceReadDataParam())
+    if piece not in vDict["pieces"]:
+        vDict["pieces"].append(piece)
 
-    })
-
-def changePath(vDict):
+def quitVariantMaker(vDict):
+    vDictPath= vDict["vDictPath"]
+    if vDict["vDictPath"] == "": vDictPath= input("vDictPath[optional]:")
+    if vDictPath == "": quit()
+    vDict["vDictPath"]= vDictPath
     try:
-        vDictPath= input("vDictPath:")
-        vDictFile= open(vDictPath, "r")
-        vDictStr= vDictFile.read()
-        vDict.update(ast.literal_eval(vDictStr))
-    except:
-        pass
+        oldVDict= loadJsonToDict(vDictPath)
+        if oldVDict == vDict: quit()
+        mustSave= "y" == input(f'overwrite \'{vDictPath}\'?[y]:')
+        if not mustSave: quit()
+        try: saveVariant(vDict, vDictPath)
+        except Exception as e:  
+            mustCancel= input(f'{e}\nfailed to save, cancel quitting?[y]:')
+            if mustCancel: return
+    except Exception as e: print(e) 
+    quit()
+
+
+def saveVariant(vDict, vDictPath="", mustMakeBackup=True):
+    def main(vDict, vDictPath):
+        if vDictPath == "": vDictPath= vDict["vDictPath"]
+        inputDesc= "required" if vDictPath == "" else "optional"
+        vDictPath= input(f'vDictPath[{inputDesc}]:')
+        if vDictPath == "": return
+        vDict["vDictPath"]= vDictPath
+        if not os.path.isfile(vDictPath): open(vDictPath,"x")
+        try: loadDictToJson(vDictPath)
+        except: save(vDict, vDictPath)
+        try:
+            if mustMakeBackup: backup(vDictPath)
+            save(vDict, vDictPath)
+        except Exception as e: print(f'saveVariant: failed to save vDict to \'{vDictPath}\'\n{e}')  
+
+    def save(vDict, vDictPath):
+        vDictFile= open(vDictPath, "w")
+        json.dump(vDict, vDictFile, indent=4, sort_keys=True) 
+        print(f'successfully saved vDict to \'{vDictPath}\'') 
+
+    def backup(vDictPath):
+        fileName= os.path.basename(vDictPath)
+        backupDir= f'.variant-backup/{fileName}'
+        os.makedirs(backupDir, exist_ok=True)
+        backupList= os.listdir(backupDir)
+        backupList.sort(key=int)
+        lastBackupName= None if len(backupList) == 0 else int(backupList[-1])
+        backupName= 0 if lastBackupName is None else lastBackupName + 1
+        backupPath= f'{backupDir}/{backupName}'
+        if not os.path.isfile(vDictPath): return
+        oldVarDict= loadJsonToDict(vDictPath)
+        if lastBackupName is not None:
+            lastBackupDict= loadJsonToDict(f'{backupDir}/{lastBackupName}')
+            if oldVarDict == lastBackupDict: return
+        shutil.copyfile(vDictPath, backupPath)
+        print(f'successfully made backup of vDict to \'{backupPath}\'')
+
+    return main(vDict, vDictPath)
+
+def loadVariant(vDict, vDictPath=""):
+    inputDesc= "required" if vDictPath == "" else "optional"
+        vDictPath= input(f'vDictPath[{inputDesc}]:')
+    try:
+        vDict.update(loadJsonToDict(vDictPath))
+        vDict["vDictPath"]= vDictPath
+        print(f'successfully loaded \'{vDictPath}\'')
+    except Exception as e: print(f'{e}\nloadVariant: failed to load \'{vDictPath}\'')
+    print(f'vDictPath=\'{vDict["vDictPath"]}\'')
+
+def initVariant(vDict):
+    dictA= {"pieces": [],
+            "moves": [],
+            "board": {},
+            "vDictPath": ""}
+    dictA.update(DCP(vDict))
+    vDict.update(dictA)
+    print("successfully initialized, initializing creates missing mappings of dict")
+
+def loadJsonToDict(jsonPath):
+    jsonFile= open(jsonPath, "r")
+    jsonDict= json.load(jsonFile)
+    return jsonDict
+
+
+def getPieceReadDataParam():
+    def main():
+        return defReadDataParam(readDict,
+               defReadDictParam("piece", [
+                   *defReadDictStrListMappings({"name": ["int"],
+                                               "team": ["int"],
+                                               "whiteLightLevel": ["int"],
+                                               "blackLightLevel": ["int"],
+                                               "hasMoved":["bool"]}),
+                   defReadDictMapping("coordinates", readList,
+                       defReadListParam("list[coordinates]", readDict,
+                       defReadDictParam("coordinates", [
+                           *defReadDictStrListMappings({"file": ["int", "str"],
+                                                        "rank": ["int", "str"]})]))),
+                   defReadDictMapping("recentMove", readList,
+                       defReadListParam("list[recentMove]", readDict,
+                       defReadDictParam("recentMove", [
+                           *defReadDictStrListMappings({"name": ["int", "str"],
+                                                        "iteration": ["str"]})])))]))
+
+    def defReadDictStrListMappings(keyTypeDict):
+        resultList= []
+        for key, typeList in keyTypeDict.items():
+             resultList.append(defReadDictMapping(key, readList,
+                               defReadListParam(f'list[{key}]', readStr,
+                               defReadStrParam("", typeList))))
+        return resultList
+
+    return main()
 
 def defReadDataParam(call, callParam):
     return {"call": call,
@@ -165,7 +235,7 @@ def readStr(param, nIndent= 0):
 
 
 INDENT_STR= "  "
-import json, ast, pprint
+import json, ast, pprint, shutil, os
 from copy import deepcopy as DCP
 if __name__ == "__main__":
     main()
