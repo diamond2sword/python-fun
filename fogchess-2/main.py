@@ -7,6 +7,10 @@ def main() -> int:
 
 class Game:
     def __init__(self):
+        pass
+    @classmethod
+    def create(cls):
+        pass
     pass
 
 if __name__ == "__main__":
