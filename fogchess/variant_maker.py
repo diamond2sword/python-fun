@@ -210,7 +210,7 @@ def getMoveReadDataParam():
                               defReadStrParam("", ["int"]))])))]))
 
     return main()
-                   
+
 
 def getPieceReadDataParam():
     def main():
@@ -265,7 +265,7 @@ def defReadListParam(desc, call, callParam,):
         raise Exception("defReadListParam: call must be in {calls}")
     return {"desc": str(desc),
             "call": call,
-            "param": callParam} 
+            "param": callParam}
 
 def defReadStrParam(desc, typeList):
     pTypes= ["int","str","float","bool"]
@@ -348,19 +348,19 @@ def readStr(param, nIndent=0, isEditing=False, dataA=None, mustPrettyPrint=False
 
 
 
- 
 
 
 
 
-        
-    
+
+
+
 
 def EMPTY_VARIANT_DICT(): return {"pieces": [],
                                   "moves": [],
                                   "board": {},
                                   "vDictPath": ""}
-INDENT_STR= "  "                 
+INDENT_STR= "  "
 import json, ast, pprint, shutil, os
 from copy import deepcopy as DCP
 if __name__ == "__main__":
